@@ -71,7 +71,36 @@ const utils = {
         if (data.annotations.description !== undefined) {
             parts.push('<br>', data.annotations.description)
         }
-        parts.push('<br><a href="', data.generatorURL,'">Alert link</a>')
+        // Add custom links if configured
+        if (process.env.ALERT_LINKS) {
+            const linkConfigs = process.env.ALERT_LINKS.split('|');
+            for (let linkConfig of linkConfigs) {
+                const firstColonIndex = linkConfig.indexOf(':');
+                if (firstColonIndex === -1) {
+                    console.error("Misconfigured ALERT_LINKS option");
+                    continue;
+                }
+
+                const name = linkConfig.substring(0, firstColonIndex);
+                let url = linkConfig.substring(firstColonIndex + 1);
+
+                if (name && url) {
+                    if (url.includes('{generatorURL}')) {
+                        url = url.replace('{generatorURL}', data.generatorURL);
+                    }
+                    url = url.replace(/{labels\.([^}]+)}/g, (match, labelName) => {
+                        return data.labels[labelName] || '';
+                    });
+                    url = url.replace(/{annotations\.([^}]+)}/g, (match, annotationName) => {
+                        return data.annotations[annotationName] || '';
+                    });
+                    parts.push('<br><a href="', url, '">', name, '</a>');
+                }
+            }
+        } else {
+            // Fallback to the original message if no custom links configured
+            parts.push('<br><a href="', data.generatorURL,'">Alert link</a>');
+        }
 
         return parts.join(' ')
     },
